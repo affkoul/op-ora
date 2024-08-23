@@ -6,9 +6,8 @@ import "./interfaces/IOpml.sol";
 import "./interfaces/IAIOracle.sol";
 
 contract AIOracle is IAIOracle {
-
-    address constant public server = 0xf5aeB5A4B35be7Af7dBfDb765F99bCF479c917BD;
-    bytes4 constant public callbackFunctionSelector = 0xb0347814;
+    address public constant server = 0xf5aeB5A4B35be7Af7dBfDb765F99bCF479c917BD;
+    bytes4 public constant callbackFunctionSelector = 0xb0347814;
 
     modifier onlyOwner() {
         require(msg.sender == owner, "Not the owner");
@@ -18,7 +17,7 @@ contract AIOracle is IAIOracle {
     // avoid calling special callback contracts
     mapping(address => bool) public blacklist;
 
-    struct AICallbackRequestData{
+    struct AICallbackRequestData {
         address account;
         uint256 requestId;
         uint256 modelId;
@@ -40,8 +39,8 @@ contract AIOracle is IAIOracle {
         uint256 accumulateRevenue;
     }
 
-    mapping (uint256 => ModelData) models;
-    mapping (uint256 => bool) modelExists;
+    mapping(uint256 => ModelData) models;
+    mapping(uint256 => bool) modelExists;
 
     uint256 public gasPrice;
     uint256[] public modelIDs;
@@ -50,10 +49,16 @@ contract AIOracle is IAIOracle {
 
     mapping(address => bool) public whitelist;
 
+    constructor() {
+        owner = msg.sender;
+    }
+
     modifier onlyWhitelisted() {
         require(whitelist[msg.sender], "Address not whitelisted");
         _;
     }
+
+    event Withdrawal(uint amount, uint when);
 
     // Function to add an address to the whitelist
     function addToWhitelist(address _address) external onlyOwner {
@@ -65,7 +70,7 @@ contract AIOracle is IAIOracle {
     }
 
     function transferOwnership(address newOwner) public {
-        if(owner == address(0)) {
+        if (owner == address(0)) {
             require(msg.sender == server, "only server can init owner");
         } else {
             require(msg.sender == owner, "Not the owner");
@@ -105,15 +110,19 @@ contract AIOracle is IAIOracle {
         return modelIDs.length;
     }
 
-    // remove the model from OAO, so OAO would not serve the model 
-    function removeModel(uint256 modelId) external onlyOwner ifModelExists(modelId) {
+    // remove the model from OAO, so OAO would not serve the model
+    function removeModel(
+        uint256 modelId
+    ) external onlyOwner ifModelExists(modelId) {
         // claim the corresponding revenue first
         ModelData storage model = models[modelId];
         if (model.accumulateRevenue > 0) {
             uint256 transferRevenue = model.accumulateRevenue;
             model.accumulateRevenue = 0;
-            (bool success, ) = (model.receiver).call{value: transferRevenue}("");
-            require(success, "claimModelRevenue transfer failed");            
+            (bool success, ) = (model.receiver).call{value: transferRevenue}(
+                ""
+            );
+            require(success, "claimModelRevenue transfer failed");
         }
         // remove model
         modelExists[modelId] = false;
@@ -140,39 +149,61 @@ contract AIOracle is IAIOracle {
         uint256 ownerRevenue = address(this).balance - modelRevenue;
         (bool success, ) = (msg.sender).call{value: ownerRevenue}("");
         require(success, "withdraw failed");
+        emit Withdrawal(ownerRevenue, block.timestamp);
     }
 
     function setOpml(address newOpml) external onlyOwner {
         opml = IOpml(newOpml);
     }
 
-    function setModelFee(uint256 modelId, uint256 _fee) external onlyOwner ifModelExists(modelId) {
+    function setModelFee(
+        uint256 modelId,
+        uint256 _fee
+    ) external onlyOwner ifModelExists(modelId) {
         ModelData storage model = models[modelId];
         model.fee = _fee;
     }
 
-    function setModelReceiver(uint256 modelId, address receiver) external onlyOwner ifModelExists(modelId) {
+    function setModelReceiver(
+        uint256 modelId,
+        address receiver
+    ) external onlyOwner ifModelExists(modelId) {
         ModelData storage model = models[modelId];
         model.receiver = receiver;
     }
 
-    function setModelReceiverPercentage(uint256 modelId, uint256 receiverPercentage) external onlyOwner ifModelExists(modelId) {
+    function setModelReceiverPercentage(
+        uint256 modelId,
+        uint256 receiverPercentage
+    ) external onlyOwner ifModelExists(modelId) {
         require(receiverPercentage <= 100, "percentage should be <= 100");
         ModelData storage model = models[modelId];
         model.receiverPercentage = receiverPercentage;
     }
 
-    function getModel(uint256 modelId) external view ifModelExists(modelId) returns (ModelData memory) {
+    function getModel(
+        uint256 modelId
+    ) external view ifModelExists(modelId) returns (ModelData memory) {
         ModelData memory model = models[modelId];
         return model;
     }
 
-    function estimateFee(uint256 modelId, uint256 gasLimit) public view ifModelExists(modelId) returns (uint256) {
+    function estimateFee(
+        uint256 modelId,
+        uint256 gasLimit
+    ) public view ifModelExists(modelId) returns (uint256) {
         ModelData storage model = models[modelId];
         return model.fee + gasPrice * gasLimit;
     }
 
-    function uploadModel(uint256 modelId, bytes32 modelHash, bytes32 programHash, uint256 fee, address receiver, uint256 receiverPercentage) external onlyOwner {
+    function uploadModel(
+        uint256 modelId,
+        bytes32 modelHash,
+        bytes32 programHash,
+        uint256 fee,
+        address receiver,
+        uint256 receiverPercentage
+    ) external onlyOwner {
         require(!modelExists[modelId], "model already exists");
         require(receiverPercentage <= 100, "percentage should be <= 100");
         modelExists[modelId] = true;
@@ -186,7 +217,14 @@ contract AIOracle is IAIOracle {
         opml.uploadModel(modelHash, programHash);
     }
 
-    function updateModel(uint256 modelId, bytes32 modelHash, bytes32 programHash, uint256 fee, address receiver, uint256 receiverPercentage) external onlyOwner ifModelExists(modelId) {
+    function updateModel(
+        uint256 modelId,
+        bytes32 modelHash,
+        bytes32 programHash,
+        uint256 fee,
+        address receiver,
+        uint256 receiverPercentage
+    ) external onlyOwner ifModelExists(modelId) {
         require(receiverPercentage <= 100, "percentage should be <= 100");
         ModelData storage model = models[modelId];
         model.modelHash = modelHash;
@@ -196,7 +234,7 @@ contract AIOracle is IAIOracle {
         model.receiverPercentage = receiverPercentage;
         opml.uploadModel(modelHash, programHash);
     }
-    
+
     function isFinalized(uint256 requestId) external view returns (bool) {
         return opml.isFinalized(requestId);
     }
@@ -204,13 +242,16 @@ contract AIOracle is IAIOracle {
     // view function
     function _validateParams(
         uint256 modelId,
-        bytes memory input, 
-        address callbackContract, 
+        bytes memory input,
+        address callbackContract,
         uint64 gasLimit
     ) internal ifModelExists(modelId) notBlacklisted(callbackContract) {
         ModelData storage model = models[modelId];
-        require(msg.value >= model.fee + gasPrice * gasLimit, "insufficient fee");
-        model.accumulateRevenue += model.fee * model.receiverPercentage / 100;
+        require(
+            msg.value >= model.fee + gasPrice * gasLimit,
+            "insufficient fee"
+        );
+        model.accumulateRevenue += (model.fee * model.receiverPercentage) / 100;
         require(input.length > 0, "input not uploaded");
         bool noCallback = callbackContract == address(0);
         require(noCallback == (gasLimit == 0), "Invalid gasLimit");
@@ -229,7 +270,11 @@ contract AIOracle is IAIOracle {
         ModelData memory model = models[modelId];
 
         // init opml request
-        uint256 requestId = opml.initOpmlRequest(model.modelHash, model.programHash, input);
+        uint256 requestId = opml.initOpmlRequest(
+            model.modelHash,
+            model.programHash,
+            input
+        );
 
         // store the request so that anyone can update the result according to the opml
         AICallbackRequestData storage request = requests[requestId];
@@ -242,13 +287,23 @@ contract AIOracle is IAIOracle {
         request.callbackData = callbackData;
 
         // Emit event
-        emit AICallbackRequest(request.account, requestId, modelId, input, callbackContract, gasLimit, callbackData);
+        emit AICallbackRequest(
+            request.account,
+            requestId,
+            modelId,
+            input,
+            callbackContract,
+            gasLimit,
+            callbackData
+        );
 
         return requestId;
     }
 
     // any can call this function
-    function claimModelRevenue(uint256 modelId) external ifModelExists(modelId) {
+    function claimModelRevenue(
+        uint256 modelId
+    ) external ifModelExists(modelId) {
         ModelData storage model = models[modelId];
         require(model.accumulateRevenue > 0, "accumulate revenue is 0");
         uint256 transferRevenue = model.accumulateRevenue;
@@ -257,7 +312,9 @@ contract AIOracle is IAIOracle {
         require(success, "claimModelRevenue transfer failed");
     }
 
-    function getOutput(uint256 requestId) external view returns (bytes memory output) {
+    function getOutput(
+        uint256 requestId
+    ) external view returns (bytes memory output) {
         return opml.getOutput(requestId);
     }
 
@@ -272,9 +329,16 @@ contract AIOracle is IAIOracle {
         require(output.length > 0, "output not uploaded");
 
         // invoke callback
-        if(request.callbackContract != address(0)) {
-            bytes memory payload = abi.encodeWithSelector(callbackFunctionSelector, request.requestId, output, request.callbackData);
-            (bool success, bytes memory data) = request.callbackContract.call{gas: request.gasLimit}(payload);
+        if (request.callbackContract != address(0)) {
+            bytes memory payload = abi.encodeWithSelector(
+                callbackFunctionSelector,
+                request.requestId,
+                output,
+                request.callbackData
+            );
+            (bool success, bytes memory data) = request.callbackContract.call{
+                gas: request.gasLimit
+            }(payload);
             require(success, "failed to call selector");
             if (!success) {
                 assembly {
@@ -287,17 +351,27 @@ contract AIOracle is IAIOracle {
     }
 
     // payload includes (function selector, input, output)
-    function invokeCallback(uint256 requestId, bytes calldata output) external onlyWhitelisted {
+    function invokeCallback(
+        uint256 requestId,
+        bytes calldata output
+    ) external onlyWhitelisted {
         // read request of requestId
         AICallbackRequestData storage request = requests[requestId];
-        
+
         // others can challenge if the result is incorrect!
         opml.uploadResult(requestId, output);
 
         // invoke callback
-        if(request.callbackContract != address(0)) {
-            bytes memory payload = abi.encodeWithSelector(callbackFunctionSelector, request.requestId, output, request.callbackData);
-            (bool success, bytes memory data) = request.callbackContract.call{gas: request.gasLimit}(payload);
+        if (request.callbackContract != address(0)) {
+            bytes memory payload = abi.encodeWithSelector(
+                callbackFunctionSelector,
+                request.requestId,
+                output,
+                request.callbackData
+            );
+            (bool success, bytes memory data) = request.callbackContract.call{
+                gas: request.gasLimit
+            }(payload);
             require(success, "failed to call selector");
             if (!success) {
                 assembly {

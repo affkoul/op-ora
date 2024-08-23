@@ -1,35 +1,32 @@
-node_modules
-.env
 
 # Hardhat files
+/cache
 /artifacts
+/contracts-bootstrap
 
 # TypeChain files
 /typechain
 /typechain-types
 
-# solidity-coverage files
+# Solidity-coverage files
 /coverage
 /coverage.json
 
-# solidity-coverage files
-/coverage
-/coverage.json
-
+# Hardhat Ignition default folder for deployments against a local node
+ignition/deployments/
+node_modules
 package-lock.json
 hardhat.config.js
 yarn.lock
 node_modules
 .env
 
-# Hardhat files
-/cache
-/artifacts
+# VS Code
+.vscode
 
-# TypeChain files
-/typechain
-/typechain-types
+# Truffle & Hardhat
+/scripts
 
-# solidity-coverage files
-/coverage
-/coverage.json
+# GAC DEV
+tree.txt
+yarn-error.log
